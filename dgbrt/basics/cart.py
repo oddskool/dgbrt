@@ -1,4 +1,5 @@
 import numpy as np
+
 __author__ = 'ediemert'
 
 ATTRIBUTES = [[0., 2., 3.],
@@ -8,8 +9,8 @@ ATTRIBUTES = [[0., 2., 3.],
               [2., 1., 1.]]
 TARGETS = map(sum, ATTRIBUTES)
 
-X = np.array(ATTRIBUTES)
-y = np.array(TARGETS)
+ATTRIBUTES = np.array(ATTRIBUTES)
+TARGETS = np.array(TARGETS)
 
 
 def corrected_variance(x):
@@ -23,8 +24,8 @@ class Split(object):
         self.split_value = split_value
         self.gain = float('-Inf')
 
-    def indexes(self, X):
-        return X[:, self.split_attribute] < self.split_value
+    def indexes(self, _X):
+        return (_X[:, self.split_attribute] < self.split_value)
 
     def evaluate(self, X, y):
         indexes = self.indexes(X)
@@ -66,29 +67,60 @@ class Node(object):
         self.split = split
         self.left = None
         self.right = None
+        self.outcome = None
+
+    def traverse(self):
+        result = []
+        nodes = [self]
+        while nodes:
+            current_node = nodes.pop()
+            result.append(current_node)
+            if current_node.left:
+                nodes.insert(0, current_node.left)
+            if current_node.right:
+                nodes.insert(0, current_node.right)
+        return result
 
     def grow(self, verbose=0):
-        if verbose: print "X", X
-        if verbose: print "y", y
+        if verbose: print "X", self.X
+        if verbose: print "y", self.y
+        if len(self.y) < 2:
+            self.outcome = np.mean(self.y)
+            if verbose: print "terminal", self.outcome
+            return
         self.split = split(self.X, self.y)
+        if self.split == Split.null():
+            self.outcome = np.mean(self.y)
+            if verbose: print "terminal", self.outcome
+            return
         if verbose: print "split", self.split
-        indexes = self.split.indexes(X)
-        if verbose: print "indexes", indexes
-        if verbose: print "X_left", self.X[indexes]
-        if verbose: print "y_left", self.y[indexes]
-        self.left = Node(self.X[indexes], self.y[indexes])
-        if verbose: print "X_right", self.X[~indexes]
-        if verbose: print "y_right", self.y[~indexes]
-        self.right = Node(self.X[~indexes], self.y[~indexes])
-
-        self.left.grow()
-        self.right.grow()
+        self.indexes = self.split.indexes(self.X)
+        if verbose: print "indexes", self.indexes
+        if verbose: print "X_left", self.X[self.indexes]
+        if verbose: print "y_left", self.y[self.indexes]
+        self.left = Node(self.X[self.indexes], self.y[self.indexes])
+        if verbose: print "X_right", self.X[~self.indexes]
+        if verbose: print "y_right", self.y[~self.indexes]
+        self.right = Node(self.X[~self.indexes], self.y[~self.indexes])
 
     @property
     def is_leaf(self):
         return not (self.right or self.left)
 
 
+def learn_tree(attributes, targets):
+    root = Node(attributes, targets)
+    tree = [root]
+    while len(tree):
+        node = tree.pop()
+        node.grow()
+        if node.left:
+            tree.insert(0, node.left)
+        if node.right:
+            tree.insert(0, node.right)
+    return root
 
-root = Node(X, y)
-root.grow(verbose=1)
+tree = learn_tree(ATTRIBUTES, TARGETS)
+nodes = tree.traverse()
+leaves = [n for n in nodes if n.is_leaf]
+assert set([n.outcome for n in leaves]) == set(TARGETS)
