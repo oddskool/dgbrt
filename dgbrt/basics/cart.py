@@ -54,7 +54,7 @@ class Node(object):
         self.split = split
         self.left = None
         self.right = None
-        self.outcome = None
+        self.outcome = np.mean(self.y) if self.y != None else None
 
     def traverse(self):
         result = []
@@ -68,13 +68,44 @@ class Node(object):
                 nodes.insert(0, current_node.right)
         return result
 
+    def predict(self, X):
+        result = np.zeros(X.shape[0])
+        for i, x in enumerate(X):
+            nodes = [self]
+            while nodes:
+                current_node = nodes.pop()
+                if current_node.is_leaf:
+                    result[i] = current_node.outcome
+                    break
+                if x[current_node.split.split_attribute] < current_node.split\
+                        .split_value:
+                    nodes.insert(0, current_node.left)
+                else:
+                    nodes.insert(0, current_node.right)
+        return result
+
+    def fit(self, X=None, y=None, max_tree_size=10):
+        self.X = X or self.X
+        self.y = y or self.y
+        tree = [self]
+        n_nodes = 1
+        while len(tree):
+            if n_nodes >= max_tree_size:
+                break
+            node = tree.pop()
+            node.grow()
+            if node.left:
+                n_nodes += 1
+                tree.insert(0, node.left)
+            if node.right:
+                n_nodes += 1
+                tree.insert(0, node.right)
+        return self
+
     def grow(self, verbose=0):
-        if len(self.y) < 2:
-            self.outcome = np.mean(self.y)
-            return
+        self.outcome = np.mean(self.y) if not self.outcome else self.outcome
         self.split = split(self.X, self.y)
         if self.split == Split.null():
-            self.outcome = np.mean(self.y)
             return
         indexes = self.split.indexes(self.X)
         self.left = Node(self.X[indexes], self.y[indexes])
@@ -84,18 +115,16 @@ class Node(object):
     def is_leaf(self):
         return not (self.right or self.left)
 
+    def __str__(self):
+        return '<Node pop=%s split=(%s,%s) outcome=%s>' % (
+            self.X.shape if self.X != None else None,
+            self.split.split_attribute,
+            self.split.split_value,
+            self.outcome)
 
-def learn_tree(attributes, targets):
-    root = Node(attributes, targets)
-    tree = [root]
-    while len(tree):
-        node = tree.pop()
-        node.grow()
-        if node.left:
-            tree.insert(0, node.left)
-        if node.right:
-            tree.insert(0, node.right)
-    return root
+    @property
+    def pstr(self):
+        return '\n'.join([str(n) for n in self.traverse()])
 
 
 if __name__ == '__main__':
@@ -110,7 +139,14 @@ if __name__ == '__main__':
     ATTRIBUTES = np.array(ATTRIBUTES)
     TARGETS = np.array(TARGETS)
 
-    tree = learn_tree(ATTRIBUTES, TARGETS)
+    tree = Node(ATTRIBUTES, TARGETS)
+    tree.fit()
+
     nodes = tree.traverse()
     leaves = [n for n in nodes if n.is_leaf]
     assert set([n.outcome for n in leaves]) == set(TARGETS)
+
+    predictions = tree.predict(ATTRIBUTES)
+    assert sum(predictions - TARGETS) == 0.0
+
+    print tree.pstr
