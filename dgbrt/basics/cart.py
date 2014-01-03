@@ -1,17 +1,5 @@
 import numpy as np
 
-__author__ = 'ediemert'
-
-ATTRIBUTES = [[0., 2., 3.],
-              [0., 2., 0.],
-              [1., 5., 6.],
-              [1., 5., 7.],
-              [2., 1., 1.]]
-TARGETS = map(sum, ATTRIBUTES)
-
-ATTRIBUTES = np.array(ATTRIBUTES)
-TARGETS = np.array(TARGETS)
-
 
 def corrected_variance(x):
     return len(x) * np.var(x)
@@ -46,7 +34,6 @@ class Split(object):
 
 
 def split(X, y, verbose=0):
-    # finding best split feature
     best_split = Split.null()
     for col_index, col in enumerate(X.T):
         for split_value in sorted(list(set(col)))[1:]:
@@ -82,26 +69,16 @@ class Node(object):
         return result
 
     def grow(self, verbose=0):
-        if verbose: print "X", self.X
-        if verbose: print "y", self.y
         if len(self.y) < 2:
             self.outcome = np.mean(self.y)
-            if verbose: print "terminal", self.outcome
             return
         self.split = split(self.X, self.y)
         if self.split == Split.null():
             self.outcome = np.mean(self.y)
-            if verbose: print "terminal", self.outcome
             return
-        if verbose: print "split", self.split
-        self.indexes = self.split.indexes(self.X)
-        if verbose: print "indexes", self.indexes
-        if verbose: print "X_left", self.X[self.indexes]
-        if verbose: print "y_left", self.y[self.indexes]
-        self.left = Node(self.X[self.indexes], self.y[self.indexes])
-        if verbose: print "X_right", self.X[~self.indexes]
-        if verbose: print "y_right", self.y[~self.indexes]
-        self.right = Node(self.X[~self.indexes], self.y[~self.indexes])
+        indexes = self.split.indexes(self.X)
+        self.left = Node(self.X[indexes], self.y[indexes])
+        self.right = Node(self.X[~indexes], self.y[~indexes])
 
     @property
     def is_leaf(self):
@@ -120,7 +97,20 @@ def learn_tree(attributes, targets):
             tree.insert(0, node.right)
     return root
 
-tree = learn_tree(ATTRIBUTES, TARGETS)
-nodes = tree.traverse()
-leaves = [n for n in nodes if n.is_leaf]
-assert set([n.outcome for n in leaves]) == set(TARGETS)
+
+if __name__ == '__main__':
+
+    ATTRIBUTES = [[0., 2., 3.],
+                  [0., 2., 0.],
+                  [1., 5., 6.],
+                  [1., 5., 7.],
+                  [2., 1., 1.]]
+    TARGETS = map(sum, ATTRIBUTES)
+
+    ATTRIBUTES = np.array(ATTRIBUTES)
+    TARGETS = np.array(TARGETS)
+
+    tree = learn_tree(ATTRIBUTES, TARGETS)
+    nodes = tree.traverse()
+    leaves = [n for n in nodes if n.is_leaf]
+    assert set([n.outcome for n in leaves]) == set(TARGETS)
